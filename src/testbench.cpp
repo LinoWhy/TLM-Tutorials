@@ -14,17 +14,21 @@
 //  limitations under the License.
 //----------------------------------------------------------------------
 
-// Version 2  16-June-2008 - updated for TLM-2.0
+// Version 2  18-June-2008 - updated for TLM-2.0
+// Version 3   3-July-2008 - bug fix: call dmi_data.init()
+// Version 4  12-Jan-2009  - fix bug in transport_dbg
+// Version 5  26-Sep-2009  - fix bug with set_end_address
 
-// Getting Started with TLM-2.0, Tutorial Example 1
+// Getting Started with TLM-2.0, Tutorial Example 2
 
 // For a full description, see http://www.doulos.com/knowhow/systemc/tlm2
 
-// Shows the generic payload, sockets, and blocking transport interface.
-// Shows the responsibilities of initiator and target with respect to the
-// generic payload. Has only dummy implementations of the direct memory and
-// debug transaction interfaces. Does not show the non-blocking transport
-// interface.
+// Shows the direct memory interfaces and the DMI hint.
+// Shows the debug transaction interface
+// Shows the proper use of response status
+
+// Define the following macro to invoke an error response from the target
+// #define INJECT_ERROR
 
 #include "top.h"
 
