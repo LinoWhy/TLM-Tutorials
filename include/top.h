@@ -2,21 +2,28 @@
 #define TOP_H
 
 #include "initiator.h"
+#include "router.h"
 #include "target.h"
 
 SC_MODULE(Top) {
     Initiator *initiator;
-    Memory *memory;
+    Router<4> *router;
+    Memory *memory[4];
 
     SC_CTOR(Top) {
         // Instantiate components
         initiator = new Initiator("initiator");
-        memory = new Memory("memory");
+        router = new Router<4>("router");
+        for (int i = 0; i < 4; i++) {
+            char txt[20];
+            sprintf(txt, "memory_%d", i);
+            memory[i] = new Memory(txt);
+        }
 
-        // One initiator is bound directly to one target with no intervening bus
-
-        // Bind initiator socket to target socket
-        initiator->socket.bind(memory->socket);
+        // Bind sockets
+        initiator->socket.bind(router->target_socket);
+        for (int i = 0; i < 4; i++)
+            router->initiator_socket[i]->bind(memory[i]->socket);
     }
 };
 

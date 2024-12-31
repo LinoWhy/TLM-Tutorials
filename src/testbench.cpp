@@ -14,18 +14,20 @@
 //  limitations under the License.
 //----------------------------------------------------------------------
 
-// Version 2  18-June-2008 - updated for TLM-2.0
-// Version 3   3-July-2008 - bug fix: call dmi_data.init()
+// Version 2 - fix warnings that only showed up using g++
+// Version 3  18-June-2008 - updated for TLM-2.0
 // Version 4  12-Jan-2009  - fix bug in transport_dbg
 // Version 5  26-Sep-2009  - fix bug with set_end_address
 
-// Getting Started with TLM-2.0, Tutorial Example 2
+// Getting Started with TLM-2.0, Tutorial Example 3
 
 // For a full description, see http://www.doulos.com/knowhow/systemc/tlm2
 
-// Shows the direct memory interfaces and the DMI hint.
-// Shows the debug transaction interface
-// Shows the proper use of response status
+// Shows a router modeled as an interconnect component between the initiator and
+// the target The router decodes the address to select a target, and masks the
+// address in the transaction Shows the router passing transport, DMI and debug
+// transactions along forward and backward paths and doing address translation
+// in both directions
 
 // Define the following macro to invoke an error response from the target
 // #define INJECT_ERROR

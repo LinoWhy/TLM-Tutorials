@@ -29,9 +29,9 @@ struct Memory : sc_module {
 
         // Initialize memory with random data
         for (int i = 0; i < SIZE; i++)
-            mem[i] = 0xAA000000 | (rand() % 256);
+            mem[i] = 0xAA000000 | (mem_nr << 20) | (rand() % 256);
 
-        SC_THREAD(invalidation_process);
+        ++mem_nr;
     }
 
     // TLM-2 blocking transport method
@@ -47,11 +47,8 @@ struct Memory : sc_module {
         //   i.e. byte enables, streaming, and bursts
         // Can ignore extensions
 
-        // *********************************************
         // Generate the appropriate error response
-        // *********************************************
-
-        if (adr >= sc_dt::uint64(SIZE)) {
+        if (adr >= SIZE) {
             trans.set_response_status(tlm::TLM_ADDRESS_ERROR_RESPONSE);
             return;
         }
@@ -64,32 +61,23 @@ struct Memory : sc_module {
             return;
         }
 
+        wait(delay);
+        delay = SC_ZERO_TIME;
+
         // Obliged to implement read and write commands
         if (cmd == tlm::TLM_READ_COMMAND)
             memcpy(ptr, &mem[adr], len);
         else if (cmd == tlm::TLM_WRITE_COMMAND)
             memcpy(&mem[adr], ptr, len);
 
-        // Illustrates that b_transport may block
-        wait(delay);
-
-        // Reset timing annotation after waiting
-        delay = SC_ZERO_TIME;
-
-        // *********************************************
         // Set DMI hint to indicated that DMI is supported
-        // *********************************************
-
         trans.set_dmi_allowed(true);
 
         // Obliged to set response status to indicate successful completion
         trans.set_response_status(tlm::TLM_OK_RESPONSE);
     }
 
-    // *********************************************
     // TLM-2 forward DMI method
-    // *********************************************
-
     virtual bool get_direct_mem_ptr(tlm::tlm_generic_payload &trans,
                                     tlm::tlm_dmi &dmi_data) {
         // Permit read and write access
@@ -105,18 +93,7 @@ struct Memory : sc_module {
         return true;
     }
 
-    void invalidation_process() {
-        // Invalidate DMI pointers periodically
-        for (int i = 0; i < 4; i++) {
-            wait(LATENCY * 8);
-            socket->invalidate_direct_mem_ptr(0, SIZE - 1);
-        }
-    }
-
-    // *********************************************
-    // TLM-2 debug transport method
-    // *********************************************
-
+    // TLM-2 debug transaction method
     virtual unsigned int transport_dbg(tlm::tlm_generic_payload &trans) {
         tlm::tlm_command cmd = trans.get_command();
         sc_dt::uint64 adr = trans.get_address() / 4;
@@ -136,6 +113,9 @@ struct Memory : sc_module {
     }
 
     int mem[SIZE];
+    static unsigned int mem_nr;
 };
+
+unsigned int Memory::mem_nr = 0;
 
 #endif
