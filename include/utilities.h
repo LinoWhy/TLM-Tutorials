@@ -8,6 +8,8 @@ using namespace std;
 
 #include "tlm.h"
 
+static ofstream fout("output.txt");
+
 // **************************************************************************************
 // User-defined memory manager, which maintains a pool of transactions
 // **************************************************************************************
@@ -55,6 +57,14 @@ void mm::free(gp_t *trans) {
     free_list = empties;
     free_list->trans = trans;
     empties = free_list->prev;
+}
+
+// Generate a random delay (with power-law distribution) to aid testing and
+// stress the protocol
+int rand_ps() {
+    int n = rand() % 100;
+    n = n * n * n;
+    return n / 100;
 }
 
 #endif

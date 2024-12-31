@@ -2,34 +2,39 @@
 #define TOP_H
 
 #include "bus.h"
-#include "initiator1.h"
-#include "initiator2.h"
+#include "initiator.h"
 #include "target.h"
 
 // *****************************************************************************************
-// Top-level module instantiates 2 initiators, a bus, and 4 memories
+// Top-level module instantiates 4 initiators, a bus, and 4 targets
 // *****************************************************************************************
 
 SC_MODULE(Top) {
-    Initiator1 *init1;
-    Initiator2 *init2;
-    Bus<2, 4> *bus;
-    Memory *memory[4];
+    Initiator *init[4];
+    Bus *bus;
+    Target *target[4];
 
     SC_CTOR(Top) {
-        init1 = new Initiator1("init1");
-        init2 = new Initiator2("init2");
-        bus = new Bus<2, 4>("bus");
+        bus = new Bus("bus");
 
-        init1->socket.bind(*(bus->targ_socket[0]));
-        init2->socket.bind(*(bus->targ_socket[1]));
+        // ***************************************************************************
+        // bus->init_socket and bus->targ_socket are multi-sockets, each bound 4
+        // times
+        // ***************************************************************************
 
         for (int i = 0; i < 4; i++) {
             char txt[20];
-            sprintf(txt, "memory_%d", i);
-            memory[i] = new Memory(txt);
+            sprintf(txt, "init_%d", i);
+            init[i] = new Initiator(txt);
+            init[i]->socket.bind(bus->targ_socket);
+        }
 
-            (*(bus->init_socket[i])).bind(memory[i]->socket);
+        for (int i = 0; i < 4; i++) {
+            char txt[20];
+            sprintf(txt, "target_%d", i);
+            target[i] = new Target(txt);
+
+            bus->init_socket.bind(target[i]->socket);
         }
     }
 };

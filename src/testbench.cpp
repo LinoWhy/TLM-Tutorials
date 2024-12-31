@@ -15,27 +15,29 @@
 //----------------------------------------------------------------------
 
 // Version 1, 26-June-2008
-// Version 2,  3-July-2008 - fix bug: call dmi_data.init()
-// Version 3  12-Jan-2009  - fix bug in transport_dbg
-// Version 4  26-Sep-2009  - fix bug with set_end_address
+// Version 2,  7-July-2008  Remove N_INITIATORS, N_TARGETS template parameters
+// from Bus Version 3   8-March-2010 Replaced target end_req_pending pointer
+// with a queue
 
-// Getting Started with TLM-2.0, Example 5
+// Getting Started with TLM-2.0, Example 6
 
-// Shows two loosely-timed initiators both with temporal decoupling and quantum
-// keeper
+// Shows the use of multi-sockets in an interconnect component,
+// that is, multi_passthrough_initiator_socket and
+// multi_passthrough_target_socket
 
-// Shows a bus with multiple initiators and multiple targets (four memories)
-// Routes transactions to target and back using address decoding built into the
-// bus Uses tagged interfaces and sockets to implement multiple fw/bw interfaces
-// in a single module Propagates DMI calls on both forward and backward paths,
-// with 'invalidate' being broadcast to every initiator
-
-// Shows transaction pooling using a memory manager
+// This example combines the AT initiator and target from example 4 with the bus
+// from example 5, modified to use multi-sockets instead of tagged sockets Uses
+// the forward and backward non-blocking transport interfaces of the bus
+// interconnect
 
 #include "top.h"
 
 int sc_main(int argc, char *argv[]) {
     Top top("top");
     sc_start();
+
+    cout << "\n***** Messages have been written to file output.txt             "
+            "       *****\n";
+
     return 0;
 }

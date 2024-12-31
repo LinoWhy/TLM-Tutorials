@@ -1,49 +1,35 @@
 #ifndef BUS_H
 #define BUS_H
 
-#include "tlm_utils/simple_initiator_socket.h"
-#include "tlm_utils/simple_target_socket.h"
+#include "tlm_utils/multi_passthrough_initiator_socket.h"
+#include "tlm_utils/multi_passthrough_target_socket.h"
 #include "utilities.h"
 
 // ************************************************************************************
 // Bus model supports multiple initiators and multiple targets
-// Supports b_ and nb_ transport interfaces, although only b_transport is
-// actually used It does no arbitration, but routes all transactions from
-// initiators without blocking It uses a simple built-in routing algorithm
+// Supports b_ and nb_ transport interfaces, DMI and debug
+// It does no arbitration, but routes all transactions from initiators without
+// blocking It uses a simple built-in routing algorithm
 // ************************************************************************************
 
-template <unsigned int N_INITIATORS, unsigned int N_TARGETS>
 struct Bus : sc_module {
-    // Tagged sockets allow incoming transactions to be identified
-    tlm_utils::simple_target_socket_tagged<Bus> *targ_socket[N_INITIATORS];
-    tlm_utils::simple_initiator_socket_tagged<Bus> *init_socket[N_TARGETS];
+    // ***********************************************************
+    // Each multi-socket can be bound to multiple sockets
+    // No need for an array-of-sockets
+    // ***********************************************************
 
-    SC_CTOR(Bus) {
-        for (unsigned int i = 0; i < N_INITIATORS; i++) {
-            char txt[20];
-            sprintf(txt, "targ_socket_%d", i);
-            targ_socket[i] =
-                new tlm_utils::simple_target_socket_tagged<Bus>(txt);
+    tlm_utils::multi_passthrough_target_socket<Bus> targ_socket;
+    tlm_utils::multi_passthrough_initiator_socket<Bus> init_socket;
 
-            targ_socket[i]->register_nb_transport_fw(this,
-                                                     &Bus::nb_transport_fw, i);
-            targ_socket[i]->register_b_transport(this, &Bus::b_transport, i);
-            targ_socket[i]->register_get_direct_mem_ptr(
-                this, &Bus::get_direct_mem_ptr, i);
-            targ_socket[i]->register_transport_dbg(this, &Bus::transport_dbg,
-                                                   i);
-        }
-        for (unsigned int i = 0; i < N_TARGETS; i++) {
-            char txt[20];
-            sprintf(txt, "init_socket_%d", i);
-            init_socket[i] =
-                new tlm_utils::simple_initiator_socket_tagged<Bus>(txt);
+    SC_CTOR(Bus) : targ_socket("targ_socket"), init_socket("init_socket") {
+        targ_socket.register_nb_transport_fw(this, &Bus::nb_transport_fw);
+        targ_socket.register_b_transport(this, &Bus::b_transport);
+        targ_socket.register_get_direct_mem_ptr(this, &Bus::get_direct_mem_ptr);
+        targ_socket.register_transport_dbg(this, &Bus::transport_dbg);
 
-            init_socket[i]->register_nb_transport_bw(this,
-                                                     &Bus::nb_transport_bw, i);
-            init_socket[i]->register_invalidate_direct_mem_ptr(
-                this, &Bus::invalidate_direct_mem_ptr, i);
-        }
+        init_socket.register_nb_transport_bw(this, &Bus::nb_transport_bw);
+        init_socket.register_invalidate_direct_mem_ptr(
+            this, &Bus::invalidate_direct_mem_ptr);
     }
 
     // Tagged non-blocking transport forward method
@@ -51,33 +37,29 @@ struct Bus : sc_module {
                                                tlm::tlm_generic_payload &trans,
                                                tlm::tlm_phase &phase,
                                                sc_time &delay) {
-        if (id < N_INITIATORS) {
-            // Forward path
-            m_id_map[&trans] = id;
+        assert(id < targ_socket.size());
 
-            sc_dt::uint64 address = trans.get_address();
-            sc_dt::uint64 masked_address;
-            unsigned int target_nr = decode_address(address, masked_address);
+        // Forward path
+        m_id_map[&trans] = id;
 
-            if (target_nr < N_TARGETS) {
-                // Modify address within transaction
-                trans.set_address(masked_address);
+        sc_dt::uint64 address = trans.get_address();
+        sc_dt::uint64 masked_address;
+        unsigned int target_nr = decode_address(address, masked_address);
 
-                // Forward transaction to appropriate target
-                tlm::tlm_sync_enum status =
-                    (*init_socket[target_nr])
-                        ->nb_transport_fw(trans, phase, delay);
+        if (target_nr < init_socket.size()) {
+            // Modify address within transaction
+            trans.set_address(masked_address);
 
-                if (status == tlm::TLM_COMPLETED)
-                    // Put back original address
-                    trans.set_address(address);
-                return status;
-            } else
-                return tlm::TLM_COMPLETED;
-        } else {
-            SC_REPORT_FATAL("TLM-2", "Invalid tagged socket id in bus");
+            // Forward transaction to appropriate target
+            tlm::tlm_sync_enum status =
+                init_socket[target_nr]->nb_transport_fw(trans, phase, delay);
+
+            if (status == tlm::TLM_COMPLETED)
+                // Put back original address
+                trans.set_address(address);
+            return status;
+        } else
             return tlm::TLM_COMPLETED;
-        }
     }
 
     // Tagged non-blocking transport backward method
@@ -85,42 +67,38 @@ struct Bus : sc_module {
                                                tlm::tlm_generic_payload &trans,
                                                tlm::tlm_phase &phase,
                                                sc_time &delay) {
-        if (id < N_TARGETS) {
-            // Backward path
+        assert(id < init_socket.size());
 
-            // Replace original address
-            sc_dt::uint64 address = trans.get_address();
-            trans.set_address(compose_address(id, address));
+        // Backward path
 
-            return (*(targ_socket[m_id_map[&trans]]))
-                ->nb_transport_bw(trans, phase, delay);
-        } else {
-            SC_REPORT_FATAL("TLM-2", "Invalid tagged socket id in bus");
-            return tlm::TLM_COMPLETED;
-        }
+        // Replace original address
+        sc_dt::uint64 address = trans.get_address();
+        trans.set_address(compose_address(id, address));
+
+        return targ_socket[m_id_map[&trans]]->nb_transport_bw(trans, phase,
+                                                              delay);
     }
 
     // Tagged TLM-2 blocking transport method
     virtual void b_transport(int id, tlm::tlm_generic_payload &trans,
                              sc_time &delay) {
-        if (id < N_INITIATORS) {
-            // Forward path
-            sc_dt::uint64 address = trans.get_address();
-            sc_dt::uint64 masked_address;
-            unsigned int target_nr = decode_address(address, masked_address);
+        assert(id < targ_socket.size());
 
-            if (target_nr < N_TARGETS) {
-                // Modify address within transaction
-                trans.set_address(masked_address);
+        // Forward path
+        sc_dt::uint64 address = trans.get_address();
+        sc_dt::uint64 masked_address;
+        unsigned int target_nr = decode_address(address, masked_address);
 
-                // Forward transaction to appropriate target
-                (*init_socket[target_nr])->b_transport(trans, delay);
+        if (target_nr < init_socket.size()) {
+            // Modify address within transaction
+            trans.set_address(masked_address);
 
-                // Replace original address
-                trans.set_address(address);
-            }
-        } else
-            SC_REPORT_FATAL("TLM-2", "Invalid tagged socket id in bus");
+            // Forward transaction to appropriate target
+            init_socket[target_nr]->b_transport(trans, delay);
+
+            // Replace original address
+            trans.set_address(address);
+        }
     }
 
     // Tagged TLM-2 forward DMI method
@@ -129,13 +107,13 @@ struct Bus : sc_module {
         sc_dt::uint64 masked_address;
         unsigned int target_nr =
             decode_address(trans.get_address(), masked_address);
-        if (target_nr >= N_TARGETS)
+        if (target_nr >= init_socket.size())
             return false;
 
         trans.set_address(masked_address);
 
         bool status =
-            (*init_socket[target_nr])->get_direct_mem_ptr(trans, dmi_data);
+            init_socket[target_nr]->get_direct_mem_ptr(trans, dmi_data);
 
         // Calculate DMI address of target in system address space
         dmi_data.set_start_address(
@@ -152,12 +130,12 @@ struct Bus : sc_module {
         sc_dt::uint64 masked_address;
         unsigned int target_nr =
             decode_address(trans.get_address(), masked_address);
-        if (target_nr >= N_TARGETS)
+        if (target_nr >= init_socket.size())
             return 0;
         trans.set_address(masked_address);
 
         // Forward debug transaction to appropriate target
-        return (*init_socket[target_nr])->transport_dbg(trans);
+        return init_socket[target_nr]->transport_dbg(trans);
     }
 
     // Tagged backward DMI method
@@ -168,23 +146,24 @@ struct Bus : sc_module {
         sc_dt::uint64 bw_end_range = compose_address(id, end_range);
 
         // Propagate call backward to all initiators
-        for (unsigned int i = 0; i < N_INITIATORS; i++)
-            (*targ_socket[i])
-                ->invalidate_direct_mem_ptr(bw_start_range, bw_end_range);
+        for (unsigned int i = 0; i < targ_socket.size(); i++)
+            targ_socket[i]->invalidate_direct_mem_ptr(bw_start_range,
+                                                      bw_end_range);
     }
 
     // Simple fixed address decoding
+    // In this example, for clarity, the address is passed through unmodified to
+    // the target
     inline unsigned int decode_address(sc_dt::uint64 address,
                                        sc_dt::uint64 &masked_address) {
-        unsigned int target_nr =
-            static_cast<unsigned int>((address >> 6) & 0x3);
-        masked_address = address & 0x3F;
+        unsigned int target_nr = static_cast<unsigned int>(address & 0x3);
+        masked_address = address;
         return target_nr;
     }
 
     inline sc_dt::uint64 compose_address(unsigned int target_nr,
                                          sc_dt::uint64 address) {
-        return (target_nr << 6) | (address & 0x3F);
+        return address;
     }
 
     std::map<tlm::tlm_generic_payload *, unsigned int> m_id_map;
