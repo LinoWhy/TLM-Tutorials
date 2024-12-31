@@ -14,40 +14,28 @@
 //  limitations under the License.
 //----------------------------------------------------------------------
 
-// Version 2  19-June-2008 - updated for TLM-2.0
+// Version 1, 26-June-2008
+// Version 2,  3-July-2008 - fix bug: call dmi_data.init()
+// Version 3  12-Jan-2009  - fix bug in transport_dbg
+// Version 4  26-Sep-2009  - fix bug with set_end_address
 
-// Getting Started with TLM-2.0, Example 4
+// Getting Started with TLM-2.0, Example 5
 
-// Shows the non-blocking transport interface with the generic payload and
-// simple sockets Shows nb_transport used with the forward and backward paths
-// Both components are able to accept transactions on the return path,
-// although neither component actually uses the return path (TLM_UPDATED)
+// Shows two loosely-timed initiators both with temporal decoupling and quantum
+// keeper
 
-// Shows the Approximately Timed coding style
-// Models processing delay of initiator, latency of target, and request and
-// response accept delays Uses payload event queues to manage both timing
-// annotations and internal delays
+// Shows a bus with multiple initiators and multiple targets (four memories)
+// Routes transactions to target and back using address decoding built into the
+// bus Uses tagged interfaces and sockets to implement multiple fw/bw interfaces
+// in a single module Propagates DMI calls on both forward and backward paths,
+// with 'invalidate' being broadcast to every initiator
 
-// Shows the BEGIN_REQ exclusion rule at the initiator and BEGIN_RESP exclusion
-// rule at the target In this example, the target allows two pipelined
-// transactions in-flight
-
-// Shows an explicit memory manager and reference counting
-
-// No use of temporal decoupling, DMI or debug transport
-// Nominal use of the blocking transport interface just to show the simple
-// socket b/nb adapter
-
-#define DEBUG
+// Shows transaction pooling using a memory manager
 
 #include "top.h"
 
 int sc_main(int argc, char *argv[]) {
     Top top("top");
     sc_start();
-
-    cout << "\n***** Messages have been written to file output.txt             "
-            "       *****\n";
-
     return 0;
 }

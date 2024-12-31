@@ -8,8 +8,6 @@ using namespace std;
 
 #include "tlm.h"
 
-static ofstream fout("output.txt");
-
 // **************************************************************************************
 // User-defined memory manager, which maintains a pool of transactions
 // **************************************************************************************
@@ -18,14 +16,7 @@ class mm : public tlm::tlm_mm_interface {
     typedef tlm::tlm_generic_payload gp_t;
 
 public:
-    mm()
-        : free_list(0), empties(0)
-#ifdef DEBUG
-          ,
-          count(0)
-#endif
-    {
-    }
+    mm() : free_list(0), empties(0) {}
 
     gp_t *allocate();
     void free(gp_t *trans);
@@ -39,17 +30,9 @@ private:
 
     access *free_list;
     access *empties;
-
-#ifdef DEBUG
-    int count;
-#endif
 };
 
 mm::gp_t *mm::allocate() {
-#ifdef DEBUG
-    fout << "----------------------------- Called allocate(), #trans = "
-         << ++count << endl;
-#endif
     gp_t *ptr;
     if (free_list) {
         ptr = free_list->trans;
@@ -62,10 +45,6 @@ mm::gp_t *mm::allocate() {
 }
 
 void mm::free(gp_t *trans) {
-#ifdef DEBUG
-    fout << "----------------------------- Called free(), #trans = " << --count
-         << endl;
-#endif
     if (!empties) {
         empties = new access;
         empties->next = free_list;
@@ -76,14 +55,6 @@ void mm::free(gp_t *trans) {
     free_list = empties;
     free_list->trans = trans;
     empties = free_list->prev;
-}
-
-// Generate a random delay (with power-law distribution) to aid testing and
-// stress the protocol
-int rand_ps() {
-    int n = rand() % 100;
-    n = n * n * n;
-    return n / 100;
 }
 
 #endif
