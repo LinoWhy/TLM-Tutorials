@@ -14,28 +14,40 @@
 //  limitations under the License.
 //----------------------------------------------------------------------
 
-// Version 2 - fix warnings that only showed up using g++
-// Version 3  18-June-2008 - updated for TLM-2.0
-// Version 4  12-Jan-2009  - fix bug in transport_dbg
-// Version 5  26-Sep-2009  - fix bug with set_end_address
+// Version 2  19-June-2008 - updated for TLM-2.0
 
-// Getting Started with TLM-2.0, Tutorial Example 3
+// Getting Started with TLM-2.0, Example 4
 
-// For a full description, see http://www.doulos.com/knowhow/systemc/tlm2
+// Shows the non-blocking transport interface with the generic payload and
+// simple sockets Shows nb_transport used with the forward and backward paths
+// Both components are able to accept transactions on the return path,
+// although neither component actually uses the return path (TLM_UPDATED)
 
-// Shows a router modeled as an interconnect component between the initiator and
-// the target The router decodes the address to select a target, and masks the
-// address in the transaction Shows the router passing transport, DMI and debug
-// transactions along forward and backward paths and doing address translation
-// in both directions
+// Shows the Approximately Timed coding style
+// Models processing delay of initiator, latency of target, and request and
+// response accept delays Uses payload event queues to manage both timing
+// annotations and internal delays
 
-// Define the following macro to invoke an error response from the target
-// #define INJECT_ERROR
+// Shows the BEGIN_REQ exclusion rule at the initiator and BEGIN_RESP exclusion
+// rule at the target In this example, the target allows two pipelined
+// transactions in-flight
+
+// Shows an explicit memory manager and reference counting
+
+// No use of temporal decoupling, DMI or debug transport
+// Nominal use of the blocking transport interface just to show the simple
+// socket b/nb adapter
+
+#define DEBUG
 
 #include "top.h"
 
 int sc_main(int argc, char *argv[]) {
     Top top("top");
     sc_start();
+
+    cout << "\n***** Messages have been written to file output.txt             "
+            "       *****\n";
+
     return 0;
 }
